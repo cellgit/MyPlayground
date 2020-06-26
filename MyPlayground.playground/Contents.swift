@@ -180,6 +180,230 @@ fib4(n: 20)
 
 
 
+// 函数进阶
+func printInt(i: Int) {
+    print("You Passed\(i)")
+}
+
+let funVar = printInt
+
+funVar(2) // 现阶段(swift5)函数调用时不能包含标签,只能在声明时包含标签,即不能将参数标签赋值给一个类型是函数的变量
+
+// 函数作为参数: 理解这个可以写出高阶函数
+func useFunction(function: (Int) -> ()) {
+    function(3)
+}
+
+useFunction(function: printInt)
+useFunction(function: funVar)
+
+/* 函数捕获作用域之外的变量
+    当函数引用了其作用域之外的变量时,这个变量就被捕获了,它们将会继续存在,而不是在超过作用域后被摧毁
+ */
+
+
+
+
+
+func isEven<T: BinaryInteger>(i: T) -> Bool {
+    return i%2 == 0
+}
+
+let int8isEven: (Int8) -> Bool = isEven
+
+int8isEven(8)
+
+
+// 使用 `@objcMembers` 令实例的所有成员在Objective-C中可见
+@objcMembers
+final class Person: NSObject {
+    
+    let first: String
+    let last: String
+    let yearOfBirth: Int
+    
+    init(first: String, last: String, yearOfBirth: Int) {
+        self.first = first
+        self.last = last
+        self.yearOfBirth = yearOfBirth
+        super.init() // 被隐式调用
+        
+//        let sortByYearAlt: SortDescriptor<Person> = sortDescriptor(key: {$0.yearOfBirth}, by: <)
+        
+//        sort()
+    }
+    
+    let people = [Person(first: "Emily", last: "Young", yearOfBirth: 2002),
+                  Person(first: "David", last: "Gray", yearOfBirth: 1991),
+                  Person(first: "Robert", last: "Barnes", yearOfBirth: 1985),
+                  Person(first: "Ava", last: "Barnes", yearOfBirth: 2000),
+                  Person(first: "Joanne", last: "Miller", yearOfBirth: 1994),
+                  Person(first: "Ava", last: "Barnes", yearOfBirth: 1998),]
+    
+    
+    
+    typealias SortDescriptor<Root> = (Root, Root) -> Bool
+    
+    func sortDescriptor<Root, Value>(key: @escaping(Root) -> Value, by areInIncreasingOrder: @escaping(Value, Value) -> Bool) -> SortDescriptor<Root> {
+        return {areInIncreasingOrder(key($0), key($1))}
+    }
+    
+    func sort() {
+        let sortByYearAlt: SortDescriptor<Person> = sortDescriptor(key: {$0.yearOfBirth}, by: <)
+        people.sorted(by: sortByYearAlt)
+        
+        if let f = people.first {
+            print(f)
+            
+        }
+        
+    }
+}
+
+
+/* 属性:
+ 1. 计算属性: 不使用任何内存来存储自己的值. 相反,这个属性每次被访问时,返回值都将被实时计算出来
+ */
+
+import CoreLocation
+
+struct GPSTrack {
+    // 使用 private(set) 或 fileprivate(set): 将record属性作为外部只读,内部可读可写
+    private(set) var record: [(CLLocation, Date)] = []
+}
+
+// 创建计算属性
+extension GPSTrack {
+    var timestamps:[Date] {
+        /// 返回GPS追踪的时间戳
+        /// 复杂度O(n), n是记录点的数量
+        return record.map {$0.1}
+    }
+}
+
+// 因为没有指定setter, 所以timestamps属性是只读. 它的结果不会被缓存,每次你访问这个属性时,结果都要被计算一遍.
+
+/* 变更观察者(编译时特性): 为属性和变量实现willSet 和 didSet 方法,每次当一个属性被设置时(就算它的值没发生变化), 这两个方法都会被调用
+ willSet 和 didSet 本质上是一对属性的简写: 一个是存储值的私有属性;另一个是读取值的公开计算属性,这个计算属性的setter会在将值存储到私有属性之前和/或之后,进行额外的工作
+ */
+
+// 可以在子类中重写属性,来添加观察者
+
+class Robot {
+    enum State {
+        case stopped, movingForward, turingRight, turningLeft
+    }
+    var state = State.stopped
+}
+
+class ObservableRobot: Robot {
+    override var state: Robot.State {
+        willSet {
+            print("Transitioning from \(state) to \(newValue)")
+        }
+    }
+}
+
+var robot = ObservableRobot()
+robot.state = .movingForward
+
+
+/* 延迟存储属性: lazy, 将工作推迟到属性被首次访问
+ 注: 它是一个返回存储值的闭包表达式. 当属性第一次被访问时,闭包将执行(注意闭包后面的括号), 它的返回值将被存储到属性中
+ */
+
+class GPSTrackViewController : UIViewController {
+    var track = GPSTrack()
+    
+    lazy var preview: UIImage = {
+        for point in track.record {
+            // 进行计算
+        }
+        return UIImage()
+    }()
+    
+}
+
+
+// 为Dictionary提供一个下标扩展,进行修改字典
+extension Dictionary {
+    public subscript<Result>(key: Key, as type: Result.Type) -> Result? {
+        get {
+            return self[key] as? Result
+        }
+        set {
+            guard let value = newValue else {
+                self[key] = nil
+                return
+            }
+            
+            guard let value2 = value as? Value else {
+                return
+            }
+            self[key] = value2
+        }
+    }
+}
+
+var japan: [String: Any] = ["name": "Japan",
+                            "capital": "Tokyo",
+                            "population": 126_740_000,
+                            "coordinate": ["latitude": 35.0, "longitude": 139.0]]
+
+japan["coordinate", as: [String: Double].self]?["latitude"] = 36.0
+
+japan["coordinate"]
+
+
+struct Address {
+    var street: String
+    var city: String
+    var zipCode: String
+}
+
+struct Person2 {
+    let name: String
+    var address: Address
+}
+
+
+let streetKeyPath = \Person2.address.street
+let nameKeyPath = \Person2.name
+
+
+
+/*
+ 自动闭包
+ */
+
+func and(_ l: Bool, _ r: @autoclosure() -> Bool) -> Bool {
+    guard l else {return false}
+    return r()
+}
+
+and(true, false)
+and(false, true)
+and(true, true)
+
+
+// 日志函数
+func log(ifFalse condition: Bool, message: @autoclosure () -> (String), file: String = #file, function: String = #function, line: Int = #line) {
+    guard !condition else {return}
+    print("Assertion failed:\(message()),\(file):\(function)(line\(line)))")
+}
+
+
+// @escaping 逃逸闭包
+//func sortDescriptor <Root, Value> (key: @escaping (Root) -> Value,
+//                                   by areInIncreasingOrder: @escaping(Value, Value) -> Bool) -> SortDescriptor<Root> {
+//    return {areInIncreasingOrder(key($0), key($1))}
+//}
+
+
+
+
+
+
 
 
 
